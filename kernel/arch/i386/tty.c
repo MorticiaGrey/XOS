@@ -7,16 +7,19 @@
 
 #include "vga.h"
 
-static const size_t VGA_WIDTH = 80;
-static const size_t VGA_HEIGHT = 25;
-static uint16_t* const VGA_MEMORY = (uint16_t*) 0xB8000;
+static size_t VGA_WIDTH;
+static size_t VGA_HEIGHT;
+static uint16_t* VGA_MEMORY;
 
 static size_t terminal_row;
 static size_t terminal_column;
 static uint8_t terminal_color;
 static uint16_t* terminal_buffer;
 
-void terminal_initialize(void) {
+void terminal_initialize(void* buffer_addr, int frame_width, int frame_height) {
+	VGA_MEMORY = (uint16_t*) buffer_addr;
+	VGA_WIDTH = frame_width;
+	VGA_HEIGHT = frame_height;
 	terminal_row = 0;
 	terminal_column = 0;
 	terminal_color = vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
@@ -34,6 +37,12 @@ void terminal_setcolor(uint8_t color) {
 }
 
 void terminal_putentryat(unsigned char c, uint8_t color, size_t x, size_t y) {
+	if (c == '\n')
+	{
+		terminal_column = 0;
+		terminal_row++;
+		return;
+	}
 	const size_t index = y * VGA_WIDTH + x;
 	terminal_buffer[index] = vga_entry(c, color);
 }
@@ -44,7 +53,7 @@ void terminal_putchar(char c) {
 	if (++terminal_column == VGA_WIDTH) {
 		terminal_column = 0;
 		if (++terminal_row == VGA_HEIGHT)
-			terminal_row = 0;
+			terminal_shift_text();
 	}
 }
 
@@ -55,4 +64,22 @@ void terminal_write(const char* data, size_t size) {
 
 void terminal_writestring(const char* data) {
 	terminal_write(data, strlen(data));
+}
+
+void terminal_shift_text() {
+	for (size_t y = 0; y < VGA_HEIGHT; y++) {
+		for (size_t x = 0; x < VGA_WIDTH; x++) {
+			const size_t index = y * VGA_WIDTH + x;
+			const size_t new_index = (y - 1) * VGA_WIDTH + x;
+			if (y == 0) {
+				terminal_buffer[index] = ' ';
+				continue;
+			}
+			terminal_buffer[new_index] = terminal_buffer[index];
+		}
+	}
+	if (terminal_row != 0) {
+		terminal_row--;
+	}
+	terminal_column = 0;
 }
