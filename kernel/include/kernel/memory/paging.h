@@ -1,0 +1,1 @@
+void init_paging(int kernel_pages);

@@ -5,6 +5,7 @@
 #include <kernel/multiboot.h>
 #include <kernel/mmap.h>
 #include <kernel/memory/mem.h>
+#include <kernel/memory/paging.h>
 
 /*
 To do:
@@ -14,9 +15,6 @@ To do:
 unsigned long long mem_amount;
 
 unsigned int iterator;
-
-extern void set_page_dir(unsigned int*);
-extern void enable_paging(void);
 
 void kernel_main(multiboot_info_t* mbt, unsigned int magic) {
 	int* mem_marker __attribute__((align(4096))) = 1; // Used to mark the start of kernel memory
@@ -57,31 +55,7 @@ void kernel_main(multiboot_info_t* mbt, unsigned int magic) {
 	// Reserve IO memory
 
 	// Memory virtualization, i.e. page map
-	// Reserving page for page directory
-	set_page((void*)((kernel_pages_to_reserve + 1) * 4096), true);
-	uint32_t page_directory[1024];
-	*page_directory = (uint32_t*) ((kernel_pages_to_reserve + 1) * 4096);
-
-	for (i = 0; i < 1024; i++) {
-		// Default state set to:
-		//    Supervisor: Only kernel can access this
-		//    Write Enabled: It can be both read from and written to
-		//    Not Present: The page table is not present
-		page_directory[i] = 0x00000002;
-	}
-
-	uint32_t first_page_table[1024];
-	set_page((void*)((kernel_pages_to_reserve + 2) * 4096), true);
-	*first_page_table = (uint32_t*) ((kernel_pages_to_reserve + 2) * 4096);
-
-	for (i = 0; i < 1024; i++) {
-		first_page_table[i] = (i * 0x1000) | 3; // supervisor, read/write, present
-	}
-
-	page_directory[0] = ((unsigned int) first_page_table) | 3;
-
-	set_page_dir(page_directory);
-	enable_paging(); // Causing problem
+	init_paging(kernel_pages_to_reserve);
 
 	printf("Success!\n");
 }
